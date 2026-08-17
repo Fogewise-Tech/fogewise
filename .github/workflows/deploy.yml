@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - chore/setup-fogewise-cicd
   workflow_dispatch:
 
 permissions:
