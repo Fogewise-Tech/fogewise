@@ -2,9 +2,6 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
 
 permissions:
   contents: read
@@ -39,4 +36,8 @@ jobs:
         run: pnpm build
 
       - name: Build production image
-        run: docker build --tag fogewise-ci:${{ github.sha }} .
+        run: docker build --tag "fogewise-ci:${GITHUB_SHA}" .
+
+      - name: Remove CI image
+        if: always()
+        run: docker image rm "fogewise-ci:${GITHUB_SHA}" >/dev/null 2>&1 || true
