@@ -8,10 +8,7 @@ permissions:
 
 jobs:
   build:
-    runs-on:
-      - self-hosted
-      - linux
-      - x64
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -37,7 +34,3 @@ jobs:
 
       - name: Build production image
         run: docker build --tag "fogewise-ci:${GITHUB_SHA}" .
-
-      - name: Remove CI image
-        if: always()
-        run: docker image rm "fogewise-ci:${GITHUB_SHA}" >/dev/null 2>&1 || true
