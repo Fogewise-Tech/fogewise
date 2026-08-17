@@ -119,6 +119,7 @@ jobs:
 
           LOG_DIR='/var/log/fogewise'
           LOG_FILE="$LOG_DIR/${REPO_NAME}-deploy.log"
+          COMPOSE_FILE="/var/lib/fogewise/apps/$REPO_NAME/compose.json"
           install -d -m 700 "$LOG_DIR"
           touch "$LOG_FILE"
           chmod 600 "$LOG_FILE"
@@ -141,10 +142,17 @@ jobs:
           fi
           trap - HUP INT TERM
 
-          docker compose \
-            -p "$REPO_NAME" \
-            -f "/var/lib/fogewise/apps/$REPO_NAME/compose.json" \
-            ps
+          docker compose -p "$REPO_NAME" -f "$COMPOSE_FILE" ps -a
+          sleep 3
+
+          if ! docker compose -p "$REPO_NAME" -f "$COMPOSE_FILE" ps --status running --services | grep -Fxq web; then
+            echo 'Web container is not running after deployment.' >&2
+            echo '--- generated compose.json ---' >&2
+            cat "$COMPOSE_FILE" >&2 || true
+            echo '--- web container logs ---' >&2
+            docker compose -p "$REPO_NAME" -f "$COMPOSE_FILE" logs --no-color --tail=120 web >&2 || true
+            exit 1
+          fi
           REMOTE
 
       - name: Configure apex Caddy route
