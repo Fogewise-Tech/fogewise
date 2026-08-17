@@ -21,6 +21,9 @@ RUN addgroup -S nodejs && adduser -S fogewise -G nodejs
 
 COPY --from=build --chown=fogewise:nodejs /app/public ./public
 COPY --from=build --chown=fogewise:nodejs /app/.next/standalone ./
+# Next standalone output can retain pnpm links into node_modules/.pnpm.
+# Keep the installed pnpm store in the runtime image so those links always resolve.
+COPY --from=deps --chown=fogewise:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=fogewise:nodejs /app/.next/static ./.next/static
 
 USER fogewise
