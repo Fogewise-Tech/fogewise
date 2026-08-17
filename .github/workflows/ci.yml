@@ -1,14 +1,24 @@
-name: CI
+name: CI / Deploy
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
 
+concurrency:
+  group: fogewise-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
 
     steps:
       - name: Checkout
@@ -34,3 +44,26 @@ jobs:
 
       - name: Build production image
         run: docker build --tag "fogewise-ci:${GITHUB_SHA}" .
+
+      - name: Remove CI image
+        if: always()
+        run: docker image rm "fogewise-ci:${GITHUB_SHA}" >/dev/null 2>&1 || true
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy
+        run: |
+          set -euo pipefail
+          sudo -n /usr/local/sbin/fogewise-local-deploy \
+            "$GITHUB_WORKSPACE" \
+            "$GITHUB_SHA"
