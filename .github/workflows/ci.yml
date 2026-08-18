@@ -22,6 +22,8 @@ jobs:
       - self-hosted
       - linux
       - x64
+    env:
+      CI_IMAGE: fogewise-ci:${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - name: Checkout
@@ -46,11 +48,11 @@ jobs:
         run: pnpm build
 
       - name: Build production image
-        run: docker build --tag "fogewise-ci:${GITHUB_SHA}" .
+        run: docker build --tag "$CI_IMAGE" .
 
       - name: Remove CI image
         if: always()
-        run: docker image rm "fogewise-ci:${GITHUB_SHA}" >/dev/null 2>&1 || true
+        run: docker image rm "$CI_IMAGE" >/dev/null 2>&1 || true
 
   deploy:
     needs: build
