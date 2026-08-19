@@ -77,7 +77,8 @@ export async function getProjects(): Promise<Project[]> {
   const rawBaseUrl = process.env.DIRECTUS_URL;
 
   if (!rawBaseUrl) {
-    throw new Error("DIRECTUS_URL is not configured");
+    console.warn("DIRECTUS_URL is not configured; building with no projects.");
+    return [];
   }
 
   const baseUrl = normalizeBaseUrl(rawBaseUrl);
