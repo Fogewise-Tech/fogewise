@@ -7,18 +7,11 @@ const BASE_VOLUME = 0.2;
 const SCROLL_VOLUME_BOOST = 0.13;
 const MAX_PLAYBACK_RATE_BOOST = 0.035;
 
-/**
- * Ambient space sound that starts on the first trusted user interaction.
- * Browsers block autoplay with sound, so there is intentionally no attempt
- * to play before a wheel/touch/pointer/key gesture.
- *
- * Scroll energy subtly lifts the volume and playback rate, then eases back to
- * the ambient baseline. The component renders no UI, so the existing HUD and
- * pointer remain unchanged.
- */
 export function SpaceSoundscape() {
   const soundEnabled = useExperienceStore((state) => state.soundEnabled);
-  const soundStartRequest = useExperienceStore((state) => state.soundStartRequest);
+  const soundStartRequest = useExperienceStore(
+    (state) => state.soundStartRequest,
+  );
   const setSoundPlaying = useExperienceStore((state) => state.setSoundPlaying);
   const soundEnabledRef = useRef(soundEnabled);
   const setSoundPlayingRef = useRef(setSoundPlaying);
@@ -30,10 +23,8 @@ export function SpaceSoundscape() {
 
   useEffect(() => {
     soundEnabledRef.current = soundEnabled;
-
     const audio = audioRef.current;
     if (!audio) return;
-
     if (!soundEnabled) {
       audio.pause();
       audio.volume = 0;
@@ -44,12 +35,18 @@ export function SpaceSoundscape() {
 
     if (startedRef.current || soundStartRequest > 0) {
       startedRef.current = true;
-      void audio.play().then(() => {
-        setSoundPlaying(true);
-      }).catch(() => {
-        startedRef.current = false;
-        setSoundPlaying(false);
-      });
+
+      audio.volume = BASE_VOLUME;
+
+      void audio
+        .play()
+        .then(() => {
+          setSoundPlaying(true);
+        })
+        .catch(() => {
+          startedRef.current = false;
+          setSoundPlaying(false);
+        });
     }
   }, [soundEnabled, soundStartRequest, setSoundPlaying]);
 
@@ -60,22 +57,27 @@ export function SpaceSoundscape() {
   useEffect(() => {
     const audio = new Audio("/audio/space-sound.mp3");
     audioRef.current = audio;
+    audio.autoplay = true;
     audio.loop = true;
     audio.preload = "auto";
-    audio.volume = 0;
+    audio.volume = BASE_VOLUME;
     audio.playbackRate = 1;
 
     const start = () => {
       if (!soundEnabledRef.current) return;
       if (startedRef.current) return;
-
       startedRef.current = true;
-      void audio.play().then(() => {
-        setSoundPlayingRef.current(true);
-      }).catch(() => {
-        startedRef.current = false;
-        setSoundPlayingRef.current(false);
-      });
+      audio.volume = BASE_VOLUME;
+
+      void audio
+        .play()
+        .then(() => {
+          setSoundPlayingRef.current(true);
+        })
+        .catch(() => {
+          startedRef.current = false;
+          setSoundPlayingRef.current(false);
+        });
     };
 
     start();
@@ -92,9 +94,18 @@ export function SpaceSoundscape() {
       addScrollEnergy(Math.min(0.7, Math.abs(event.deltaY) / 900));
     };
 
-    const onTouchStart = () => start();
-    const onTouchMove = () => addScrollEnergy(0.16);
-    const onPointerDown = () => start();
+    const onTouchStart = () => {
+      start();
+    };
+
+    const onTouchMove = () => {
+      addScrollEnergy(0.16);
+    };
+
+    const onPointerDown = () => {
+      start();
+    };
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (
         event.key === "ArrowDown" ||
@@ -114,17 +125,13 @@ export function SpaceSoundscape() {
         ? Math.min(0.05, (now - lastFrameRef.current) / 1000)
         : 1 / 60;
       lastFrameRef.current = now;
-
-      // Fast enough to feel connected to the scroll, slow enough to avoid
-      // audible pumping between mouse-wheel ticks.
       scrollEnergyRef.current *= Math.exp(-2.8 * deltaSeconds);
       const energy = scrollEnergyRef.current;
 
-      if (startedRef.current && !audio.paused) {
+      if (startedRef.current && !audio.paused && soundEnabledRef.current) {
         const targetVolume = BASE_VOLUME + SCROLL_VOLUME_BOOST * energy;
         const volumeEase = 1 - Math.exp(-4.8 * deltaSeconds);
         audio.volume += (targetVolume - audio.volume) * volumeEase;
-
         const targetRate = 1 + MAX_PLAYBACK_RATE_BOOST * energy;
         const rateEase = 1 - Math.exp(-4.2 * deltaSeconds);
         audio.playbackRate += (targetRate - audio.playbackRate) * rateEase;
@@ -134,18 +141,18 @@ export function SpaceSoundscape() {
     };
 
     const onVisibilityChange = () => {
-      if (document.hidden) {
-        audio.pause();
-        return;
-      }
-
-      if (soundEnabledRef.current && startedRef.current) {
-        void audio.play().then(() => {
-          setSoundPlayingRef.current(true);
-        }).catch(() => {
-          startedRef.current = false;
-          setSoundPlayingRef.current(false);
-        });
+      if (!document.hidden && soundEnabledRef.current) {
+        if (audio.paused) {
+          void audio
+            .play()
+            .then(() => {
+              startedRef.current = true;
+              setSoundPlayingRef.current(true);
+            })
+            .catch(() => {
+              setSoundPlayingRef.current(false);
+            });
+        }
       }
     };
 
@@ -155,9 +162,7 @@ export function SpaceSoundscape() {
     window.addEventListener("pointerdown", onPointerDown, { passive: true });
     window.addEventListener("keydown", onKeyDown);
     document.addEventListener("visibilitychange", onVisibilityChange);
-
     frameRef.current = requestAnimationFrame(tick);
-
     return () => {
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("touchstart", onTouchStart);
@@ -166,7 +171,10 @@ export function SpaceSoundscape() {
       window.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("visibilitychange", onVisibilityChange);
 
-      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+      }
+
       audio.pause();
       audio.src = "";
       audioRef.current = null;

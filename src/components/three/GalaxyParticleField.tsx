@@ -3,12 +3,13 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { getInfiniteJourneyState } from "@/lib/journey";
+import { getJourneyState } from "@/lib/journey";
 import { useExperienceStore } from "@/store/useExperienceStore";
 
-const GATHER_PARTICLE_COUNT = 3200;
-const AMBIENT_PARTICLE_COUNT = 520;
-const PARTICLE_COUNT = GATHER_PARTICLE_COUNT + AMBIENT_PARTICLE_COUNT;
+const DESKTOP_GATHER_PARTICLE_COUNT = 3200;
+const DESKTOP_AMBIENT_PARTICLE_COUNT = 520;
+const MOBILE_GATHER_PARTICLE_COUNT = 1250;
+const MOBILE_AMBIENT_PARTICLE_COUNT = 180;
 
 function seededRandom(seed: number) {
   let value = seed >>> 0;
@@ -18,9 +19,6 @@ function seededRandom(seed: number) {
   };
 }
 
-// Keep the infinite field/wrapping from v6, but use the exact gather/release
-// motion language from the uploaded reference version: gentle free drift,
-// direct smooth convergence, subtle breathing and slow orbit while focused.
 const vertexShader = /* glsl */ `
   attribute vec3 aOrigin;
   attribute vec3 aCluster;
@@ -40,13 +38,10 @@ const vertexShader = /* glsl */ `
     float seed = aSeed;
     float halfDepth = uFieldDepth * 0.5;
 
-    // Infinite world: each molecule wraps independently around the camera,
-    // so the field never ends and never jumps as one large group.
     float wrappedZ = uCameraZ
       + mod(aOrigin.z - uCameraZ + halfDepth, uFieldDepth)
       - halfDepth;
 
-    // Same dispersed animation as src(1).zip.
     vec3 drift = vec3(
       sin(uTime * (0.11 + seed * 0.08) + seed * 18.0),
       cos(uTime * (0.09 + seed * 0.06) + seed * 27.0),
@@ -56,13 +51,10 @@ const vertexShader = /* glsl */ `
     vec3 freePosition = vec3(aOrigin.xy, wrappedZ)
       + drift * (0.12 + seed * 0.32);
 
-    // Same focused breathing animation as src(1).zip.
     vec3 radial = normalize(aCluster + vec3(0.0001));
     float pulse = sin(uTime * 0.72 + seed * 22.0) * (0.025 + seed * 0.065);
     vec3 clusterPosition = uTarget + aCluster + radial * pulse;
 
-    // No stagger wave / curved detour: particles gather with the same smooth
-    // direct interpolation as the reference version. Density stays from v6.
     float gather = clamp(uGather * aGatherWeight, 0.0, 1.0);
     vec3 particlePosition = mix(freePosition, clusterPosition, gather);
 
@@ -98,7 +90,6 @@ const fragmentShader = /* glsl */ `
     vec3 ice = vec3(0.73, 0.86, 1.0);
     vec3 violet = vec3(0.67, 0.55, 1.0);
 
-    // Match the reference particle look while focused.
     vec3 color = mix(deep, ice, 0.35 + vSeed * 0.5);
     color = mix(color, violet, vGather * (0.22 + vSeed * 0.2));
     color += core * vec3(0.45);
@@ -110,39 +101,46 @@ const fragmentShader = /* glsl */ `
 
 type Props = {
   projectPositions: THREE.Vector3[];
-  cycleOffset: THREE.Vector3;
+  mobileMode?: boolean;
 };
 
 export function GalaxyParticleField({
   projectPositions,
-  cycleOffset,
+  mobileMode = false,
 }: Props) {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
   const scrollProgress = useExperienceStore((state) => state.scrollProgress);
   const focusStrength = useExperienceStore((state) => state.focusStrength);
 
-  const journey = getInfiniteJourneyState(scrollProgress, projectPositions.length);
+  const journey = getJourneyState(scrollProgress, projectPositions.length);
   const target = useMemo(() => new THREE.Vector3(), []);
   const fallbackTarget = useMemo(() => new THREE.Vector3(0, 0, -4), []);
 
-  const fieldDepth = useMemo(
-    () => Math.max(104, Math.abs(cycleOffset.z) * 2.35),
-    [cycleOffset.z],
-  );
+  const fieldDepth = useMemo(() => {
+    const lastZ = projectPositions[projectPositions.length - 1]?.z ?? -44;
+    return Math.max(104, Math.abs(lastZ) * 2.35);
+  }, [projectPositions]);
 
   const attributes = useMemo(() => {
-    const random = seededRandom(20260815);
-    const origins = new Float32Array(PARTICLE_COUNT * 3);
-    const clusters = new Float32Array(PARTICLE_COUNT * 3);
-    const seeds = new Float32Array(PARTICLE_COUNT);
-    const gatherWeights = new Float32Array(PARTICLE_COUNT);
+    const gatherParticleCount = mobileMode
+      ? MOBILE_GATHER_PARTICLE_COUNT
+      : DESKTOP_GATHER_PARTICLE_COUNT;
+    const ambientParticleCount = mobileMode
+      ? MOBILE_AMBIENT_PARTICLE_COUNT
+      : DESKTOP_AMBIENT_PARTICLE_COUNT;
+    const particleCount = gatherParticleCount + ambientParticleCount;
 
-    for (let index = 0; index < PARTICLE_COUNT; index += 1) {
+    const random = seededRandom(20260815);
+    const origins = new Float32Array(particleCount * 3);
+    const clusters = new Float32Array(particleCount * 3);
+    const seeds = new Float32Array(particleCount);
+    const gatherWeights = new Float32Array(particleCount);
+
+    for (let index = 0; index < particleCount; index += 1) {
       const i3 = index * 3;
       const seed = random();
 
-      // Infinite dispersed field from v6.
-      const zT = (index + random()) / PARTICLE_COUNT;
+      const zT = (index + random()) / particleCount;
       const angle = random() * Math.PI * 2;
       const radial = Math.sqrt(random());
       const radiusX = 14.8 * radial;
@@ -152,7 +150,6 @@ export function GalaxyParticleField({
       origins[i3 + 1] = Math.sin(angle) * radiusY + (random() - 0.5) * 0.9;
       origins[i3 + 2] = fieldDepth * (0.5 - zT);
 
-      // Keep the denser v6 cluster shape requested in the previous turn.
       const theta = random() * Math.PI * 2;
       const phi = Math.acos(2 * random() - 1);
       const clusterSeed = random();
@@ -170,11 +167,8 @@ export function GalaxyParticleField({
       clusters[i3 + 2] = Math.sin(phi) * Math.sin(theta) * radius * 0.92;
 
       seeds[index] = seed;
-      // Keep the existing gathered-node density unchanged. The extra particles
-      // are ambient-only, so the open-space molecular field feels slightly
-      // denser without making the focused node blow out brighter.
       gatherWeights[index] =
-        index >= GATHER_PARTICLE_COUNT
+        index >= gatherParticleCount
           ? 0.0
           : seed < 0.035
             ? 0.58
@@ -184,7 +178,7 @@ export function GalaxyParticleField({
     }
 
     return { origins, clusters, seeds, gatherWeights };
-  }, [fieldDepth]);
+  }, [fieldDepth, mobileMode]);
 
   const uniforms = useMemo(
     () => ({
@@ -204,7 +198,6 @@ export function GalaxyParticleField({
     material.uniforms.uTime.value = state.clock.elapsedTime;
     material.uniforms.uCameraZ.value = state.camera.position.z;
 
-    // Exact response speed from the uploaded reference version.
     material.uniforms.uGather.value = THREE.MathUtils.damp(
       material.uniforms.uGather.value,
       focusStrength,
@@ -212,14 +205,10 @@ export function GalaxyParticleField({
       delta,
     );
 
-    target
-      .copy(projectPositions[journey.activeIndex] ?? fallbackTarget)
-      .addScaledVector(cycleOffset, journey.activeCycle);
+    target.copy(projectPositions[journey.activeIndex] ?? fallbackTarget);
 
     const uniformTarget = material.uniforms.uTarget.value as THREE.Vector3;
 
-    // Infinite-specific safeguard: change node while particles are dispersed,
-    // otherwise keep the reference's 3.8 target interpolation feel.
     if (focusStrength < 0.015) {
       uniformTarget.copy(target);
     } else {

@@ -9,15 +9,28 @@ import { useExperienceStore } from "@/store/useExperienceStore";
 
 type Props = { projects: Project[] };
 
+function smoothstep(value: number) {
+  const t = Math.min(1, Math.max(0, value));
+  return t * t * (3 - 2 * t);
+}
+
 export function PortfolioHud({ projects }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
   const activeIndex = useExperienceStore((state) => state.activeIndex);
   const focusStrength = useExperienceStore((state) => state.focusStrength);
+  const scrollProgress = useExperienceStore((state) => state.scrollProgress);
   const selectedProjectId = useExperienceStore(
     (state) => state.selectedProjectId,
   );
 
   const project = projects[activeIndex];
+  const lastProjectCheckpoint =
+    projects.length > 0 ? (projects.length - 1) / projects.length : 0;
+  const contactStart =
+    lastProjectCheckpoint + (1 - lastProjectCheckpoint) * 0.38;
+  const contactStrength = smoothstep(
+    (scrollProgress - contactStart) / Math.max(0.0001, 1 - contactStart),
+  );
 
   useLayoutEffect(() => {
     if (!panelRef.current) return;
@@ -35,10 +48,11 @@ export function PortfolioHud({ projects }: Props) {
       className={`portfolio-hud ${selectedProjectId ? "portfolio-hud--dimmed" : ""}`}
     >
       <header className="hud-header">
-        <div className="brand" aria-label="FOGEWISE showcase">
+        <a href="/" className="brand" aria-label="FOGEWISE showcase">
           <span className="brand__name">FOGEWISE</span>
-          <span className="brand__script">showcase</span>
-        </div>
+          <span className="brand__script">Showcase</span>
+        </a>
+
         <SoundToggle />
       </header>
 
@@ -46,11 +60,12 @@ export function PortfolioHud({ projects }: Props) {
         ref={panelRef}
         className="hud-project-panel"
         style={{
-          opacity: focusStrength,
-          pointerEvents: focusStrength > 0.22 ? "auto" : "none",
+          opacity: focusStrength * (1 - contactStrength),
+          pointerEvents:
+            focusStrength > 0.22 && contactStrength < 0.2 ? "auto" : "none",
         }}
       >
-        <ProjectMeta project={project} />
+        <ProjectMeta project={project} index={activeIndex} total={projects.length} />
       </div>
 
       <footer className="hud-footer" />

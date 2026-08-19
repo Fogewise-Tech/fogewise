@@ -10,6 +10,7 @@ type Props = {
   project: Project;
   position: THREE.Vector3;
   active: boolean;
+  mobileMode?: boolean;
 };
 
 type OrbitConfig = {
@@ -88,15 +89,17 @@ function OrbitLine({
   radiusZ,
   color,
   opacity,
+  mobileMode = false,
 }: {
   radiusX: number;
   radiusZ: number;
   color: THREE.ColorRepresentation;
   opacity: number;
+  mobileMode?: boolean;
 }) {
   const geometry = useMemo(() => {
     const points: THREE.Vector3[] = [];
-    const segments = 120;
+    const segments = mobileMode ? 48 : 120;
     for (let index = 0; index < segments; index += 1) {
       const theta = (index / segments) * Math.PI * 2;
 
@@ -110,7 +113,7 @@ function OrbitLine({
     }
 
     return new THREE.BufferGeometry().setFromPoints(points);
-  }, [radiusX, radiusZ]);
+  }, [radiusX, radiusZ, mobileMode]);
 
   const material = useMemo(
     () =>
@@ -147,7 +150,12 @@ function OrbitLine({
   return <primitive object={orbitLine} />;
 }
 
-export function ProjectGalaxyNode({ project, position, active }: Props) {
+export function ProjectGalaxyNode({
+  project,
+  position,
+  active,
+  mobileMode = false,
+}: Props) {
   const groupRef = useRef<THREE.Group>(null);
   const orbitRefs = useRef<Array<THREE.Group | null>>([]);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
@@ -162,7 +170,7 @@ export function ProjectGalaxyNode({ project, position, active }: Props) {
 
   const orbits = useMemo(() => {
     const rand = createSeededRandom(hashString(project.id));
-    const ringCount = 3 + Math.floor(rand() * 2);
+    const ringCount = mobileMode ? 2 : 3 + Math.floor(rand() * 2);
     return Array.from({ length: ringCount }, (_, index) => {
       const radiusX = 1.55 + index * 0.62 + rand() * 0.28;
       const radiusZ = radiusX * (0.72 + rand() * 0.18);
@@ -191,7 +199,7 @@ export function ProjectGalaxyNode({ project, position, active }: Props) {
         lineOpacity,
       } satisfies OrbitConfig;
     });
-  }, [project.id]);
+  }, [project.id, mobileMode]);
 
   useEffect(() => {
     if (!hovered) return;
@@ -249,11 +257,13 @@ export function ProjectGalaxyNode({ project, position, active }: Props) {
         openProject(project.id);
       }}
     >
-      <pointLight
-        color={accent}
-        intensity={active ? 2.6 + energy * 4.2 : 0.35}
-        distance={10}
-      />
+      {(!mobileMode || active) && (
+        <pointLight
+          color={accent}
+          intensity={active ? 2.6 + energy * 4.2 : 0.35}
+          distance={10}
+        />
+      )}
 
       {orbits.map((orbit, index) => (
         <group
@@ -270,29 +280,39 @@ export function ProjectGalaxyNode({ project, position, active }: Props) {
             opacity={
               (active ? 0.24 : 0.12) + orbit.lineOpacity * (0.35 + energy * 0.9)
             }
+            mobileMode={mobileMode}
           />
 
           <group position={[orbit.radiusX, 0, 0]}>
             <mesh scale={orbit.satelliteScale} renderOrder={4}>
-              <sphereGeometry args={[1, 18, 18]} />
-              <meshStandardMaterial
-                color={orbit.satelliteColor}
-                emissive={orbit.satelliteColor}
-                emissiveIntensity={active ? 1.2 : 0.45}
-                toneMapped={false}
-              />
+              <sphereGeometry args={[1, mobileMode ? 10 : 18, mobileMode ? 10 : 18]} />
+              {mobileMode ? (
+                <meshBasicMaterial
+                  color={orbit.satelliteColor}
+                  toneMapped={false}
+                />
+              ) : (
+                <meshStandardMaterial
+                  color={orbit.satelliteColor}
+                  emissive={orbit.satelliteColor}
+                  emissiveIntensity={active ? 1.2 : 0.45}
+                  toneMapped={false}
+                />
+              )}
             </mesh>
-            <pointLight
-              color={orbit.satelliteColor}
-              intensity={active ? 1.2 : 0.28}
-              distance={2.2}
-            />
+            {!mobileMode && (
+              <pointLight
+                color={orbit.satelliteColor}
+                intensity={active ? 1.2 : 0.28}
+                distance={2.2}
+              />
+            )}
           </group>
         </group>
       ))}
 
       <mesh renderOrder={3}>
-        <icosahedronGeometry args={[0.78, 7]} />
+        <icosahedronGeometry args={[0.78, mobileMode ? 3 : 7]} />
         <shaderMaterial
           ref={materialRef}
           vertexShader={vertexShader}
@@ -310,7 +330,7 @@ export function ProjectGalaxyNode({ project, position, active }: Props) {
       </mesh>
 
       <mesh scale={0.42} renderOrder={4}>
-        <sphereGeometry args={[1, 32, 32]} />
+        <sphereGeometry args={[1, mobileMode ? 16 : 32, mobileMode ? 16 : 32]} />
         <meshBasicMaterial
           color={active ? "#eef6ff" : "#7180a8"}
           transparent

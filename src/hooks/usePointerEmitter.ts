@@ -115,14 +115,8 @@ export function usePointerEmitter({
     const scrollDelta = Math.abs(scrollProgress - lastScrollProgress.current);
     const pointerDriven = performance.now() - lastInputAt.current < 90;
 
-    // Scroll now acts as a second emitter input. The pointer itself stays at
-    // the exact same screen position; camera motion makes its world-space
-    // emitter travel, so the nebula trail feels as if the user is moving it.
-    // Virtual journey progress is continuous across native-scroll recycling,
-    // therefore this also stays continuous from the last node to the next cycle.
     const scrollDriven = scrollDelta > 0.000015 && distanceMoved > 0.0015;
 
-    // Keep a hard safety guard for genuinely discontinuous camera jumps.
     if (distanceMoved > Math.max(6, distance * 1.2)) {
       emitterRef.current.copy(world);
       trailRef.current = [];
@@ -155,8 +149,6 @@ export function usePointerEmitter({
       });
       lastSample.current.copy(world);
     } else if (!movingRef.current) {
-      // When neither mouse nor scroll is moving, keep the sample origin synced
-      // so a later interaction never draws a connector from stale geometry.
       lastSample.current.copy(world);
     }
 

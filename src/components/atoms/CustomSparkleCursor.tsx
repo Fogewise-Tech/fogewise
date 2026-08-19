@@ -9,7 +9,6 @@ export function CustomSparkleCursor() {
     const root = rootRef.current;
     if (!root) return;
 
-    // Keep the sparkle visible immediately, even before the first pointer move.
     const startX = window.innerWidth / 2;
     const startY = window.innerHeight / 2;
     root.style.transform = `translate3d(${startX}px, ${startY}px, 0) translate(-50%, -50%)`;

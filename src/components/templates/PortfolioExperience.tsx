@@ -4,34 +4,29 @@ import { useLayoutEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import type { Project } from "@/types/project";
-import { CustomSparkleCursor } from "@/components/atoms/CustomSparkleCursor";
 import { SpaceSoundscape } from "@/components/atoms/SpaceSoundscape";
+import { GlitterWarpBackground } from "@/components/atoms/GlitterWarpBackground";
+import TwinGalaxyRings from "@/components/atoms/TwinGalaxyRings";
 import { ExperienceCanvas } from "@/components/organisms/ExperienceCanvas";
 import { PortfolioHud } from "@/components/organisms/PortfolioHud";
-import { ProjectDetailOverlay } from "@/components/organisms/ProjectDetailOverlay";
-import { getInfiniteJourneyState } from "@/lib/journey";
+import { TeamContactOverlay } from "@/components/organisms/TeamContactOverlay";
+import { getJourneyState } from "@/lib/journey";
 import { useExperienceStore } from "@/store/useExperienceStore";
+import { useMobilePerformanceMode } from "@/hooks/useMobilePerformanceMode";
 
 type Props = { projects: Project[] };
 
 gsap.registerPlugin(ScrollTrigger);
 
+const SCROLL_RESPONSE = 7.2;
+const MAX_FRAME_DELTA = 1 / 20;
+
 export function PortfolioExperience({ projects }: Props) {
   const rootRef = useRef<HTMLElement>(null);
-  const cycleRef = useRef(0);
-  const recyclingRef = useRef(false);
   const setJourneyState = useExperienceStore((state) => state.setJourneyState);
+  const mobilePerformanceMode = useMobilePerformanceMode();
 
-  const baseScrollHeightVh = Math.max(650, (projects.length + 1) * 190);
-
-  // One original journey occupies 60% of the native scroll range.
-  // That lets us recycle well before the browser reaches the page bottom,
-  // while preserving the exact scroll distance/speed of the original source.
-  const loopStart = 0.2;
-  const loopEnd = 0.8;
-  const loopSpan = loopEnd - loopStart;
-  const firstCycleEnd = loopSpan;
-  const scrollHeightVh = 100 + (baseScrollHeightVh - 100) / loopSpan;
+  const scrollHeightVh = Math.max(760, (projects.length + 2) * 190);
 
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -39,109 +34,76 @@ export function PortfolioExperience({ projects }: Props) {
 
     const previousScrollRestoration = window.history.scrollRestoration;
     window.history.scrollRestoration = "manual";
-
-    // A hard reload must always look exactly like the original first frame.
-    cycleRef.current = 0;
-    recyclingRef.current = true;
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
 
+    let targetProgress = 0;
+    let renderedProgress = 0;
+    let lastTime = performance.now();
+    let rafId = 0;
+    let trigger: ScrollTrigger | null = null;
+    let lastCommittedProgress = -1;
+
+    const commitJourney = (progress: number) => {
+      const normalized = Math.min(1, Math.max(0, progress));
+      const journey = getJourneyState(normalized, projects.length);
+
+      setJourneyState(
+        normalized,
+        journey.activeIndex,
+        journey.focusStrength,
+      );
+    };
+
+    const animate = (now: number) => {
+      const delta = Math.min(MAX_FRAME_DELTA, Math.max(0, (now - lastTime) / 1000));
+      lastTime = now;
+
+      const alpha = 1 - Math.exp(-SCROLL_RESPONSE * delta);
+      renderedProgress += (targetProgress - renderedProgress) * alpha;
+
+      if (Math.abs(targetProgress - renderedProgress) < 0.00001) {
+        renderedProgress = targetProgress;
+      }
+
+      if (Math.abs(renderedProgress - lastCommittedProgress) > 0.00001) {
+        commitJourney(renderedProgress);
+        lastCommittedProgress = renderedProgress;
+      }
+      rafId = requestAnimationFrame(animate);
+    };
+
     const context = gsap.context(() => {
-      const commitJourney = (localProgress: number) => {
-        const local = Math.min(1, Math.max(0, localProgress));
-        const virtualProgress = cycleRef.current + local;
-        const journey = getInfiniteJourneyState(virtualProgress, projects.length);
-        setJourneyState(
-          virtualProgress,
-          journey.activeIndex,
-          journey.focusStrength,
-        );
-      };
-
-      const recycleScroll = (self: ScrollTrigger, normalized: number) => {
-        const top = self.start + (self.end - self.start) * normalized;
-        recyclingRef.current = true;
-        window.scrollTo({ top, left: 0, behavior: "auto" });
-
-        requestAnimationFrame(() => {
-          recyclingRef.current = false;
-          ScrollTrigger.update();
-        });
-      };
-
-      const trigger = ScrollTrigger.create({
+      trigger = ScrollTrigger.create({
         trigger: root,
         start: "top top",
         end: "bottom bottom",
         onUpdate: (self) => {
-          if (recyclingRef.current) return;
-
-          // First pass begins at the real top of the document.
-          if (cycleRef.current === 0) {
-            if (self.direction > 0 && self.progress >= firstCycleEnd) {
-              // Preserve wheel/touch overshoot instead of snapping exactly to
-              // progress 0 of the next virtual cycle. This removes the tiny
-              // one-frame pause that could be felt at the recycle point.
-              const overflow = Math.max(0, self.progress - firstCycleEnd);
-              const nextLocal = Math.min(0.12, overflow / loopSpan);
-              cycleRef.current = 1;
-              commitJourney(nextLocal);
-              recycleScroll(self, loopStart + nextLocal * loopSpan);
-              return;
-            }
-
-            commitJourney(self.progress / firstCycleEnd);
-            return;
-          }
-
-          // Every following pass stays inside the middle of the document.
-          // The native scrollbar therefore never arrives at its bottom edge.
-          if (self.direction > 0 && self.progress >= loopEnd) {
-            const overflow = Math.max(0, self.progress - loopEnd);
-            const nextLocal = Math.min(0.12, overflow / loopSpan);
-            cycleRef.current += 1;
-            commitJourney(nextLocal);
-            recycleScroll(self, loopStart + nextLocal * loopSpan);
-            return;
-          }
-
-          if (self.direction < 0 && self.progress <= loopStart) {
-            const underflow = Math.max(0, loopStart - self.progress);
-            const previousLocal = Math.max(0.88, 1 - underflow / loopSpan);
-            cycleRef.current = Math.max(0, cycleRef.current - 1);
-            commitJourney(previousLocal);
-            recycleScroll(
-              self,
-              cycleRef.current === 0
-                ? firstCycleEnd * previousLocal
-                : loopStart + previousLocal * loopSpan,
-            );
-            return;
-          }
-
-          commitJourney((self.progress - loopStart) / loopSpan);
+          targetProgress = Math.min(1, Math.max(0, self.progress));
         },
       });
 
+      targetProgress = 0;
+      renderedProgress = 0;
       commitJourney(0);
+      rafId = requestAnimationFrame(animate);
 
-      // Chrome can try to restore the old scroll after hydration. Re-assert
-      // the top position for the first paint only; later loop recycling is
-      // handled exclusively by ScrollTrigger above.
       requestAnimationFrame(() => {
         window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+
         requestAnimationFrame(() => {
-          recyclingRef.current = false;
           ScrollTrigger.refresh();
-          ScrollTrigger.update();
+          trigger?.update();
         });
       });
     }, root);
 
     return () => {
+      cancelAnimationFrame(rafId);
+      trigger?.kill();
       context.revert();
       window.history.scrollRestoration = previousScrollRestoration;
     };
-  }, [firstCycleEnd, loopEnd, loopSpan, loopStart, projects.length, setJourneyState]);
+  }, [projects.length, setJourneyState]);
 
   return (
     <main
@@ -150,12 +112,22 @@ export function PortfolioExperience({ projects }: Props) {
       style={{ minHeight: `${scrollHeightVh}vh` }}
     >
       <SpaceSoundscape />
-      <CustomSparkleCursor />
+      <GlitterWarpBackground mobileMode={mobilePerformanceMode} />
+
       <div className="canvas-shell">
-        <ExperienceCanvas projects={projects} />
+        <div className="twin-galaxy-layer">
+          <TwinGalaxyRings
+            projectCount={projects.length}
+            mobileMode={mobilePerformanceMode}
+          />
+        </div>
+        <div className="experience-canvas-layer">
+          <ExperienceCanvas projects={projects} mobileMode={mobilePerformanceMode} />
+        </div>
       </div>
+
       <PortfolioHud projects={projects} />
-      <ProjectDetailOverlay projects={projects} />
+      <TeamContactOverlay projectCount={projects.length} />
     </main>
   );
 }
