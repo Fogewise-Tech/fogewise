@@ -21,7 +21,7 @@ export type Project = {
   result?: string;
   highlights?: string[];
 
-  featured: boolean;
+  featured?: boolean;
   published: boolean;
   sortOrder: number;
 };

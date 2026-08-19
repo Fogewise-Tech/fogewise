@@ -14,7 +14,7 @@ export function ProjectMeta({ project, index = 0, total = 1 }: Props) {
   return (
     <section className="project-meta">
       <p className="project-eyebrow">
-        PLANET {planetNumber} / {totalPlanets} · {project.category} · {project.year}
+        {project.category} · {project.year}
       </p>
       <h1 className="project-title">{project.name}</h1>
       <p className="project-kicker">{project.tagline}</p>

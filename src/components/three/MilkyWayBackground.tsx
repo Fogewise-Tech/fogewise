@@ -263,34 +263,34 @@ export function MilkyWayBackground({ contactPosition, strength = 1 }: Props) {
 
     const target = targetPositionRef.current;
     target.set(
-      contactPosition.x + 3.2 - pointerX * 0.48,
-      contactPosition.y - 0.45 - pointerY * 0.2,
+      contactPosition.x + 3.2 - pointerX * 0.16,
+      contactPosition.y - 0.45 - pointerY * 0.06,
       contactPosition.z - 26.0,
     );
 
-    group.position.lerp(target, 1 - Math.exp(-delta * 1.6));
-    group.rotation.x = THREE.MathUtils.damp(group.rotation.x, 1.38, 1.3, delta);
+    group.position.lerp(target, 1 - Math.exp(-delta * 0.48));
+    group.rotation.x = THREE.MathUtils.damp(group.rotation.x, 1.18, 0.22, delta);
     group.rotation.y = THREE.MathUtils.damp(
       group.rotation.y,
-      0.08 + pointerX * 0.03,
-      1.2,
+      0.035 + pointerX * 0.003,
+      0.18,
       delta,
     );
     group.rotation.z = THREE.MathUtils.damp(
       group.rotation.z,
-      -0.48 + Math.sin(time * 0.055) * 0.012 - pointerX * 0.018,
-      1.1,
+      -0.32 + Math.sin(time * 0.014) * 0.002 - pointerX * 0.0015,
+      0.16,
       delta,
     );
 
     const targetScale = THREE.MathUtils.lerp(0.5, 0.67, reveal);
-    const breathe = 1 + Math.sin(time * 0.11) * 0.006;
+    const breathe = 1 + Math.sin(time * 0.055) * 0.0035;
     group.scale.setScalar(targetScale * breathe);
 
-    if (hazeRef.current) hazeRef.current.rotation.z += delta * 0.0032;
-    if (starsRef.current) starsRef.current.rotation.z += delta * 0.0054;
-    if (coreRef.current) coreRef.current.rotation.z += delta * 0.009;
-    if (streaksRef.current) streaksRef.current.rotation.z += delta * 0.0024;
+    if (hazeRef.current) hazeRef.current.rotation.z += delta * 0.00028;
+    if (starsRef.current) starsRef.current.rotation.z += delta * 0.00042;
+    if (coreRef.current) coreRef.current.rotation.z += delta * 0.00065;
+    if (streaksRef.current) streaksRef.current.rotation.z += delta * 0.00022;
 
     if (hazeMaterialRef.current) hazeMaterialRef.current.opacity = 0.17 * visibility;
     if (starsMaterialRef.current) starsMaterialRef.current.opacity = 0.5 * visibility;
@@ -303,7 +303,7 @@ export function MilkyWayBackground({ contactPosition, strength = 1 }: Props) {
     <group
       ref={groupRef}
       position={[contactPosition.x + 3.2, contactPosition.y - 0.45, contactPosition.z - 26]}
-      rotation={[1.38, 0.08, -0.48]}
+      rotation={[1.18, 0.035, -0.32]}
       scale={0.5}
     >
       <sprite position={[0, 0, -0.3]} scale={[18, 8.5, 1]} renderOrder={-24}>

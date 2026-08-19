@@ -65,7 +65,11 @@ export function PortfolioHud({ projects }: Props) {
             focusStrength > 0.22 && contactStrength < 0.2 ? "auto" : "none",
         }}
       >
-        <ProjectMeta project={project} index={activeIndex} total={projects.length} />
+        <ProjectMeta
+          project={project}
+          index={activeIndex}
+          total={projects.length}
+        />
       </div>
 
       <footer className="hud-footer" />

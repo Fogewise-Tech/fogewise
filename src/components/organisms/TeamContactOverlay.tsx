@@ -17,7 +17,6 @@ function smoothstep(value: number) {
   return t * t * (3 - 2 * t);
 }
 
-
 export function TeamContactOverlay({ projectCount }: Props) {
   const scrollProgress = useExperienceStore((state) => state.scrollProgress);
 
@@ -32,11 +31,9 @@ export function TeamContactOverlay({ projectCount }: Props) {
    * - Milky Way starts shortly after, while the copy is STILL approaching.
    * - Copy reaches final framing first; Milky Way continues behind it.
    */
-  const textTravelStart =
-    lastProjectCheckpoint + finalSegment * 0.72;
+  const textTravelStart = lastProjectCheckpoint + finalSegment * 0.72;
 
-  const textTravelEnd =
-    lastProjectCheckpoint + finalSegment * 0.995;
+  const textTravelEnd = lastProjectCheckpoint + finalSegment * 0.995;
 
   const textProgress = clamp01(
     (scrollProgress - textTravelStart) /
@@ -47,9 +44,7 @@ export function TeamContactOverlay({ projectCount }: Props) {
 
   const textScale = 0.075 + approach * 0.925;
 
-  const strength = smoothstep(
-    (textProgress - 0.03) / 0.68,
-  );
+  const strength = smoothstep((textProgress - 0.03) / 0.68);
 
   const depthLift = (1 - approach) * 8;
   const blur = (1 - approach) * 1.7;
@@ -70,7 +65,6 @@ export function TeamContactOverlay({ projectCount }: Props) {
           filter: `blur(${blur}px)`,
         }}
       >
-        <p className="team-contact__eyebrow">DESTINATION REACHED</p>
         <h2 className="team-contact__headline">
           <span>WITH US IT HAPPENS.</span>
 
