@@ -384,10 +384,34 @@ button {
   font-size: 12px;
 }
 
+
+
+
+
+.detail-backdrop {
+  background: rgba(0, 8, 39, 0.82);
+  backdrop-filter: blur(22px) saturate(1.15);
+}
+
+.detail-card {
+  border-radius: 0;
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(4, 10, 38, 0.94);
+  box-shadow: 0 0 0 1px rgba(36, 69, 255, 0.16) inset;
+}
+
+.detail-actions a {
+  border-radius: 0;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: #1739f4;
+}
+
 @media (max-width: 760px) {
   .portfolio-hud {
     padding: 18px;
   }
+
+
 
   .hud-caption,
   .scroll-copy {
